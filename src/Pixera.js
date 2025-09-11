@@ -289,6 +289,17 @@ class Pixera {
 		self.INDEX_RESOURCE = 0;
 		self.INDEX_RESOURCEFOLDER = 0;
 	}
+
+	// load variables helper lazily to avoid circular require issues
+	loadVariablesHelper() {
+		if (!this.variablesHelper) {
+			try {
+				this.variablesHelper = require('./variables');
+			} catch (e) {
+				this.instance.log('error', 'Could not load variables helper: ' + e.message);
+			}
+		}
+	}
 	initScreens() {
 		let self = this.instance;
 		this.send(13, 'Pixera.Screens.getScreens');
@@ -365,6 +376,11 @@ class Pixera {
 							}
 						}
 						self.updateActions();
+						// names/fps have become available; initialize variable definitions now
+						this.loadVariablesHelper();
+						if (this.variablesHelper && this.variablesHelper.initDefinitions) {
+							this.variablesHelper.initDefinitions(self);
+						}
 					}
 					break;
 				case 13: //Pixera.Screens.getScreens
@@ -982,6 +998,12 @@ class Pixera {
 									}
 								}
 							}
+
+							// After processing monitoring entries, refresh Companion variables
+							this.loadVariablesHelper();
+							if (this.variablesHelper && this.variablesHelper.updateVariables) {
+								this.variablesHelper.updateVariables(self);
+							}
 						}
 					}
 					break;
@@ -990,6 +1012,70 @@ class Pixera {
 						var result = jsonData.result;
 						if (result != null) {
 							self.SELECTEDTIMELINES = result;
+
+							// Ensure we have a feedback entry for the Selected Timeline (handle -1)
+							let selIdx = -1
+							for (let i = 0; i < self.CHOICES_TIMELINEFEEDBACK.length; i++) {
+								if (self.CHOICES_TIMELINEFEEDBACK[i].handle === -1) {
+									selIdx = i
+									break
+								}
+							}
+							if (selIdx === -1) {
+								// create a placeholder entry for selected timeline
+								self.CHOICES_TIMELINEFEEDBACK.push({
+									handle: -1,
+									timelineTransport: '0',
+									timelinePositions: '0',
+									timelineCountdowns: '0',
+									name: 'Selected Timeline',
+									fps: '0',
+								})
+								// index of the newly pushed entry
+								selIdx = self.CHOICES_TIMELINEFEEDBACK.length - 1
+								// (re)create variable definitions so timeline_selected_* exists
+								this.loadVariablesHelper()
+								if (this.variablesHelper && this.variablesHelper.initDefinitions) {
+									this.variablesHelper.initDefinitions(self)
+								}
+							}
+
+							// If Pixera returned one or more selected handles, copy the first selected timeline's live values
+							if (Array.isArray(result) && result.length > 0) {
+								const firstSelHandle = result[0]
+								// find the timeline entry matching that handle
+								let sourceIdx = -1
+								for (let j = 0; j < self.CHOICES_TIMELINEFEEDBACK.length; j++) {
+									if (self.CHOICES_TIMELINEFEEDBACK[j].handle === firstSelHandle) {
+										sourceIdx = j
+										break
+									}
+								}
+
+								if (selIdx !== -1) {
+									if (sourceIdx !== -1) {
+										// copy live values from the actual timeline into the selected entry
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].timelineTransport = self.CHOICES_TIMELINEFEEDBACK[sourceIdx].timelineTransport
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].timelinePositions = self.CHOICES_TIMELINEFEEDBACK[sourceIdx].timelinePositions
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].timelineCountdowns = self.CHOICES_TIMELINEFEEDBACK[sourceIdx].timelineCountdowns
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].name = self.CHOICES_TIMELINEFEEDBACK[sourceIdx].name
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].fps = self.CHOICES_TIMELINEFEEDBACK[sourceIdx].fps
+									} else {
+										// no matching source yet; reset selected values
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].timelineTransport = '0'
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].timelinePositions = '0'
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].timelineCountdowns = '0'
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].name = 'Selected Timeline'
+										self.CHOICES_TIMELINEFEEDBACK[selIdx].fps = '0'
+									}
+								}
+							}
+
+							// Update Companion variables for the selected timeline immediately
+							this.loadVariablesHelper()
+							if (this.variablesHelper && this.variablesHelper.updateVariables) {
+								this.variablesHelper.updateVariables(self)
+							}
 						}
 					}
 					break;

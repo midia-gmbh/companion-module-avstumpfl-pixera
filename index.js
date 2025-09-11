@@ -4,6 +4,7 @@ const Pixera = require('./src/Pixera')
 const config = require('./src/config')
 const actions = require('./src/actions')
 const feedbacks = require('./src/feedbacks')
+const variables = require('./src/variables')
 
 class PixeraInstance extends InstanceBase {
 		constructor(internal) {
@@ -14,6 +15,7 @@ class PixeraInstance extends InstanceBase {
 				...config,
 				...actions,
 				...feedbacks,
+				...variables,
 			})
 		}
 

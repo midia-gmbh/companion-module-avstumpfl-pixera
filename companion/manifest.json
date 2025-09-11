@@ -3,7 +3,7 @@
 	"name": "avstumpfl-pixera",
 	"shortname": "pixera",
 	"description": "Module to control AVStumpfl Pixera",
-	"version": "3.2.3",
+	"version": "3.3.0-midia",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-avstumpfl-pixera.git",
 	"bugs": "https://github.com/bitfocus/companion-module-avstumpfl-pixera/issues",
