@@ -1084,6 +1084,7 @@ class Pixera {
 							self.checkFeedbacks('timeline_state_selected')
 							self.checkFeedbacks('timeline_positions_selected')
 							self.checkFeedbacks('timeline_countdowns_selected')
+							self.checkFeedbacks('timeline_selected')
 						}
 					}
 					break;

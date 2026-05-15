@@ -192,6 +192,36 @@ module.exports = {
 					}
 				}//close callback
 			},//close timeline positions
+			timeline_selected: {
+				type: 'advanced',
+				name: 'Change color from Selected Timeline',
+				options: [
+				{
+					type: 'textinput',
+					label: 'Timeline Name',
+					id: 'timelinename_feedback',
+					default: '',
+				},
+				{
+					type: 'colorpicker',
+					label: 'Foreground color',
+					id: 'fg',
+					default: combineRgb(255, 255, 255),
+				},
+				{
+					type: 'colorpicker',
+					label: 'Background color',
+					id: 'bg',
+					default: combineRgb(255, 165, 0),
+				},
+				],
+				callback: function(feedback) {
+					const entry = (self.CHOICES_TIMELINENAME || []).find(c => c.label === feedback.options.timelinename_feedback)
+					if (entry && (self.SELECTEDTIMELINES || []).includes(entry.id)) {
+						return { color: feedback.options.fg, bgcolor: feedback.options.bg }
+					}
+				},
+			},
 			timeline_state_selected: {
 				type: 'advanced',
 				name: 'Change color from Selected Timeline State',
