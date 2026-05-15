@@ -53,7 +53,6 @@ module.exports = {
 				}
 				],
 				callback: function(feedback, bank) {
-					self.log('debug','checkForFeedbacks: ' + feedback.options.run_fg);
 					for(let i = 0; i<self.CHOICES_TIMELINEFEEDBACK.length;i++){
 						if(self.CHOICES_TIMELINEFEEDBACK[i]['name']==feedback.options.timelinename_feedback){
 							if (self.CHOICES_TIMELINEFEEDBACK[i]['timelineTransport'] == 1) {//Play
