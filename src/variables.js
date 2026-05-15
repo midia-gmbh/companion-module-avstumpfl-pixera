@@ -49,6 +49,9 @@ function sanitizeName(name) {
     // collapse multiple underscores and trim
     s = s.replace(/_+/g, '_').replace(/^_+|_+$/g, '')
 
+    // final safety strip – remove any char still not in [a-z0-9_-]
+    s = s.replace(/[^a-z0-9_-]/g, '')
+
     // if slug starts with digit, prefix with 't_'
     if (/^[0-9]/.test(s)) s = `t_${s}`
 
@@ -90,9 +93,7 @@ module.exports = {
         } else {
           effectiveSlug = baseSlug && baseSlug.length > 0 ? baseSlug : `timeline_${handle}`
         }
-        const idState = `timeline_state_${effectiveSlug}`
-
-        if (defs.find((d) => d.variableId === idState)) {
+        if (defs.find((d) => d.variableId === `timeline_${effectiveSlug}_state`)) {
           effectiveSlug = `${effectiveSlug}_${handle}`
           if (instance && instance.log) {
             try {
@@ -194,15 +195,6 @@ if (!defs.find((d) => d.variableId === finalIdFps)) {
     effectiveSlug = baseSlug && baseSlug.length > 0 ? baseSlug : `timeline_${handle}`
   }
 
-  const idState = `timeline_${effectiveSlug}_state`
-  const idPositions = `timeline_${effectiveSlug}_position`
-  const idCountdowns = `timeline_${effectiveSlug}_countdown`
-  const idName = `timeline_${effectiveSlug}_name`
-  const idFps = `timeline_${effectiveSlug}_fps`
-
-  // Note: duplicate-name detection and slug adjustment is handled when definitions are created.
-
-  // recompute ids if we changed the slug
   const finalIdState = `timeline_${effectiveSlug}_state`
   const finalIdPositions = `timeline_${effectiveSlug}_position`
   const finalIdCountdowns = `timeline_${effectiveSlug}_countdown`
