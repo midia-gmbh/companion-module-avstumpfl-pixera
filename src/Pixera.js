@@ -381,6 +381,9 @@ class Pixera {
 						if (this.variablesHelper && this.variablesHelper.initDefinitions) {
 							this.variablesHelper.initDefinitions(self);
 						}
+						if (self.updatePresets) {
+							self.updatePresets();
+						}
 					}
 					break;
 				case 13: //Pixera.Screens.getScreens

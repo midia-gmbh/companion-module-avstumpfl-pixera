@@ -31,7 +31,7 @@ module.exports = {
 					type: 'colorpicker',
 					label: 'Pause: Foreground color',
 					id: 'pause_fg',
-					default: combineRgb(255,255,255)
+					default: combineRgb(0,0,0)
 				},
 				{
 					type: 'colorpicker',

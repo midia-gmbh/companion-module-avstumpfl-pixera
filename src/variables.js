@@ -101,6 +101,9 @@ module.exports = {
           }
         }
 
+        // Store slug back so other modules (e.g. presets) can reference it
+        list[i].slug = effectiveSlug
+
   const basePrefix = `timeline_${effectiveSlug}`
   const finalIdState = `${basePrefix}_state`
   const finalIdPositions = `${basePrefix}_position`
