@@ -1,187 +1,171 @@
 const { combineRgb } = require('@companion-module/base')
 
+const WHITE = combineRgb(255, 255, 255)
+const BLACK = combineRgb(0, 0, 0)
+const GREEN = combineRgb(0, 200, 0)
+const YELLOW = combineRgb(255, 255, 0)
+const RED = combineRgb(200, 0, 0)
+const BLUE_DARK = combineRgb(0, 0, 153)
+
+const TRANSPORT_MODES = [
+	{ mode: 1, icon: '⏵', label: 'Play',   run_bg: GREEN,  pause_bg: BLACK,  stop_bg: BLACK,  run_fg: WHITE, pause_fg: WHITE, stop_fg: WHITE },
+	{ mode: 2, icon: '⏸', label: 'Pause',  run_bg: BLACK,  pause_bg: YELLOW, stop_bg: BLACK,  run_fg: WHITE, pause_fg: BLACK, stop_fg: WHITE },
+	{ mode: 3, icon: '⏹', label: 'Stop',   run_bg: BLACK,  pause_bg: BLACK,  stop_bg: RED,    run_fg: WHITE, pause_fg: WHITE, stop_fg: WHITE },
+	{ mode: 4, icon: '⏯', label: 'Toggle', run_bg: GREEN,  pause_bg: YELLOW, stop_bg: BLACK,  run_fg: WHITE, pause_fg: BLACK, stop_fg: WHITE },
+]
+
+const STATE_FEEDBACK_ALL = { run_bg: GREEN, pause_bg: YELLOW, stop_bg: RED, run_fg: WHITE, pause_fg: BLACK, stop_fg: WHITE }
+
+const TIMECODE_LABELS = [
+	{ id: '1', label: 'HH', title: 'Hour' },
+	{ id: '2', label: 'MM', title: 'Minute' },
+	{ id: '3', label: 'SS', title: 'Second' },
+	{ id: '4', label: 'FF', title: 'Frame' },
+]
+
+const CUE_MODES = [
+	{ actionId: 'timeline_next_cue', optKey: 'timelinename_next', icon: '⏭', label: 'Next Cue' },
+	{ actionId: 'timeline_prev_cue', optKey: 'timelinename_prev', icon: '⏮', label: 'Previous Cue' },
+]
+
+const TIMECODE_SECTIONS = [
+	{ header: 'Timeline Timecode', varSuffix: 'position_timecode',  varLabel: 'Position',  feedbackId: 'timeline_positions',  feedbackIdSelected: 'timeline_positions_selected' },
+	{ header: 'Timeline Countdown', varSuffix: 'countdown_timecode', varLabel: 'Countdown', feedbackId: 'timeline_countdowns', feedbackIdSelected: 'timeline_countdowns_selected' },
+]
+
+function stateFb(feedbackId, name, colors) {
+	return { feedbackId, options: { timelinename_feedback: name, ...colors } }
+}
+
 module.exports = {
 	updatePresets() {
 		const self = this
 		const presets = []
 
-		for (const tl of (self.CHOICES_TIMELINEFEEDBACK || [])) {
+		// --- Selected Timeline (fixed category, handle -1) ---
+		const selectedCategory = 'Selected Timeline'
+
+		presets.push({ type: 'text', category: selectedCategory, name: 'Transport', text: 'Transport controls for the currently selected timeline.' })
+		for (const t of TRANSPORT_MODES) {
+			presets.push({
+				type: 'button',
+				category: selectedCategory,
+				name: `Selected – ${t.label}`,
+				style: { text: t.icon, size: '60', color: WHITE, bgcolor: BLACK },
+				steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: t.mode, timelinename_state: -1 } }], up: [] }],
+				feedbacks: [{ feedbackId: 'timeline_state_selected', options: { run_fg: t.run_fg, run_bg: t.run_bg, pause_fg: t.pause_fg, pause_bg: t.pause_bg, stop_fg: t.stop_fg, stop_bg: t.stop_bg } }],
+			})
+		}
+		presets.push({
+			type: 'button',
+			category: selectedCategory,
+			name: 'Selected – State Feedback',
+			style: { text: '', size: '14', color: WHITE, bgcolor: BLACK },
+			steps: [{ down: [], up: [] }],
+			feedbacks: [{ feedbackId: 'timeline_state_selected', options: STATE_FEEDBACK_ALL }],
+		})
+
+		presets.push({ type: 'text', category: selectedCategory, name: 'Cue Navigation', text: 'Jump to the next or previous cue on the selected timeline.' })
+		for (const c of CUE_MODES) {
+			presets.push({
+				type: 'button',
+				category: selectedCategory,
+				name: `Selected – ${c.label}`,
+				style: { text: c.icon, size: '60', color: WHITE, bgcolor: BLUE_DARK },
+				steps: [{ down: [{ actionId: c.actionId, options: { [c.optKey]: -1, [`${c.optKey}_ignore`]: false, [`${c.optKey}_blend`]: false, blend_name_frames: 60 } }], up: [] }],
+				feedbacks: [],
+			})
+		}
+
+		for (const sec of TIMECODE_SECTIONS) {
+			presets.push({ type: 'text', category: selectedCategory, name: sec.header, text: `Full ${sec.varLabel} or individual components via feedback.` })
+			presets.push({
+				type: 'button',
+				category: selectedCategory,
+				name: `Selected – ${sec.varLabel}`,
+				style: { text: `$(pixera:timeline_selected_${sec.varSuffix})`, size: '14', color: WHITE, bgcolor: BLACK },
+				steps: [{ down: [], up: [] }],
+				feedbacks: [],
+			})
+			for (const tc of TIMECODE_LABELS) {
+				presets.push({
+					type: 'button',
+					category: selectedCategory,
+					name: `Selected – ${sec.varLabel} ${tc.title}`,
+					style: { text: tc.label, size: '24', color: WHITE, bgcolor: BLACK },
+					steps: [{ down: [], up: [] }],
+					feedbacks: [{ feedbackId: sec.feedbackIdSelected, options: { show_label: tc.id } }],
+				})
+			}
+		}
+
+		// --- Per-Timeline Presets ---
+		for (const tl of (self.CHOICES_TIMELINEFEEDBACK || []).filter(tl => tl.handle !== -1)) {
 			const { name, handle, slug } = tl
 			const category = `Timeline: ${name}`
 
-			// --- Transport ---
 			presets.push({ type: 'text', category, name: 'Transport', text: 'Transport controls for this timeline.' })
-
-			// Play
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Play`,
-				style: { text: '⏵', size: '60', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-				steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: 1, timelinename_state: handle } }], up: [] }],
-				feedbacks: [{ feedbackId: 'timeline_state', options: {
-					timelinename_feedback: name,
-					run_fg: combineRgb(255, 255, 255), run_bg: combineRgb(0, 255, 0),
-					pause_fg: combineRgb(0, 0, 0), pause_bg: combineRgb(0, 0, 0),
-					stop_fg: combineRgb(255, 255, 255), stop_bg: combineRgb(0, 0, 0),
-				} }],
-			})
-
-			// Pause
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Pause`,
-				style: { text: '⏸', size: '60', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-				steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: 2, timelinename_state: handle } }], up: [] }],
-				feedbacks: [{ feedbackId: 'timeline_state', options: {
-					timelinename_feedback: name,
-					run_fg: combineRgb(255, 255, 255), run_bg: combineRgb(0, 0, 0),
-					pause_fg: combineRgb(0, 0, 0), pause_bg: combineRgb(255, 255, 0),
-					stop_fg: combineRgb(255, 255, 255), stop_bg: combineRgb(0, 0, 0),
-				} }],
-			})
-
-			// Stop
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Stop`,
-				style: { text: '⏹', size: '60', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-				steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: 3, timelinename_state: handle } }], up: [] }],
-				feedbacks: [{ feedbackId: 'timeline_state', options: {
-					timelinename_feedback: name,
-					run_fg: combineRgb(255, 255, 255), run_bg: combineRgb(0, 0, 0),
-					pause_fg: combineRgb(0, 0, 0), pause_bg: combineRgb(0, 0, 0),
-					stop_fg: combineRgb(255, 255, 255), stop_bg: combineRgb(255, 0, 0),
-				} }],
-			})
-
-			// Toggle Play/Pause
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Toggle Play/Pause`,
-				style: { text: '⏯', size: '60', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-				steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: 4, timelinename_state: handle } }], up: [] }],
-				feedbacks: [{ feedbackId: 'timeline_state', options: {
-					timelinename_feedback: name,
-					run_fg: combineRgb(255, 255, 255), run_bg: combineRgb(0, 255, 0),
-					pause_fg: combineRgb(0, 0, 0), pause_bg: combineRgb(255, 255, 0),
-					stop_fg: combineRgb(255, 255, 255), stop_bg: combineRgb(0, 0, 0),
-				} }],
-			})
-			// Timeline State Feedback
+			for (const t of TRANSPORT_MODES) {
+				presets.push({
+					type: 'button',
+					category,
+					name: `${name} – ${t.label}`,
+					style: { text: t.icon, size: '60', color: WHITE, bgcolor: BLACK },
+					steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: t.mode, timelinename_state: handle } }], up: [] }],
+					feedbacks: [stateFb('timeline_state', name, { run_fg: t.run_fg, run_bg: t.run_bg, pause_fg: t.pause_fg, pause_bg: t.pause_bg, stop_fg: t.stop_fg, stop_bg: t.stop_bg })],
+				})
+			}
 			presets.push({
 				type: 'button',
 				category,
 				name: `${name} – State Feedback`,
-				style: { text: '', size: '14', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+				style: { text: '', size: '14', color: WHITE, bgcolor: BLACK },
 				steps: [{ down: [], up: [] }],
-				feedbacks: [{ feedbackId: 'timeline_state', options: {
-					timelinename_feedback: name,
-					run_fg: combineRgb(255, 255, 255), run_bg: combineRgb(0, 255, 0),
-					pause_fg: combineRgb(0, 0, 0), pause_bg: combineRgb(255, 255, 0),
-					stop_fg: combineRgb(255, 255, 255), stop_bg: combineRgb(255, 0, 0),
-				} }],
+				feedbacks: [stateFb('timeline_state', name, STATE_FEEDBACK_ALL)],
 			})
 
-			// --- Cue Navigation ---
 			presets.push({ type: 'text', category, name: 'Cue Navigation', text: 'Jump to the next or previous cue.' })
+			for (const c of CUE_MODES) {
+				presets.push({
+					type: 'button',
+					category,
+					name: `${name} – ${c.label}`,
+					style: { text: c.icon, size: '60', color: WHITE, bgcolor: BLUE_DARK },
+					steps: [{ down: [{ actionId: c.actionId, options: { [c.optKey]: handle, [`${c.optKey}_ignore`]: false, [`${c.optKey}_blend`]: false, blend_name_frames: 60 } }], up: [] }],
+					feedbacks: [],
+				})
+			}
 
-			// Next Cue
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Nächster Cue`,
-				style: { text: '⏭', size: '60', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 153) },
-				steps: [{ down: [{ actionId: 'timeline_next_cue', options: { timelinename_next: handle, timelinename_next_ignore: false, timelinename_next_blend: false, blend_name_frames: 60 } }], up: [] }],
-				feedbacks: [],
-			})
-
-			// Previous Cue
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Vorheriger Cue`,
-				style: { text: '⏮', size: '60', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 153) },
-				steps: [{ down: [{ actionId: 'timeline_prev_cue', options: { timelinename_prev: handle, timelinename_prev_ignore: false, timelinename_prev_blend: false, blend_name_frames: 60 } }], up: [] }],
-				feedbacks: [],
-			})
-
-			// --- Select ---
 			presets.push({ type: 'text', category, name: 'Select', text: 'Select this timeline in Pixera.' })
-
-			// Timeline Select
 			presets.push({
 				type: 'button',
 				category,
 				name: `${name} – Select`,
-				style: { text: `Select\n${name}`, size: '14', color: combineRgb(255, 255, 255), bgcolor: combineRgb(204, 101, 0) },
+				style: { text: `Select\n${name}`, size: '14', color: WHITE, bgcolor: combineRgb(204, 101, 0) },
 				steps: [{ down: [{ actionId: 'timeline_select', options: { timeline_select_timeline: handle } }], up: [] }],
 				feedbacks: [],
 			})
 
-			// --- Timecode Feedback ---
-			presets.push({ type: 'text', category, name: 'Timeline Timecode', text: 'Full Timecode or Individual timecode components: Hour, Minute, Second, Frame' })
-
-			// Position Timecode (via variable)
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Position`,
-				style: { text: `$(pixera:timeline_${slug}_position_timecode)`, size: '14', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-				steps: [{ down: [], up: [] }],
-				feedbacks: [],
-			})
-
-			// Timecode (positions) feedback – 4 buttons: Hour, Minute, Second, Frame
-			const timecodeLabels = [
-				{ id: '1', label: 'HH', title: 'Hour' },
-				{ id: '2', label: 'MM', title: 'Minute' },
-				{ id: '3', label: 'SS', title: 'Second' },
-				{ id: '4', label: 'FF', title: 'Frame' },
-			]
-			for (const tc of timecodeLabels) {
+			for (const sec of TIMECODE_SECTIONS) {
+				presets.push({ type: 'text', category, name: sec.header, text: `Full ${sec.varLabel} or individual components: Hour, Minute, Second, Frame.` })
 				presets.push({
 					type: 'button',
 					category,
-					name: `${name} – Timecode ${tc.title}`,
-					style: { text: tc.label, size: '24', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+					name: `${name} – ${sec.varLabel}`,
+					style: { text: `$(pixera:timeline_${slug}_${sec.varSuffix})`, size: '14', color: WHITE, bgcolor: BLACK },
 					steps: [{ down: [], up: [] }],
-					feedbacks: [{ feedbackId: 'timeline_positions', options: {
-						timelinename_feedback: name,
-						show_label: tc.id,
-					} }],
+					feedbacks: [],
 				})
-			}
-
-			// --- Countdown Feedback ---
-			presets.push({ type: 'text', category, name: 'Timeline Countdown', text: 'Full Countdown or Individual countdown components: Hour, Minute, Second, Frame.' })
-
-			// Countdown Timecode (via variable)
-			presets.push({
-				type: 'button',
-				category,
-				name: `${name} – Countdown`,
-				style: { text: `$(pixera:timeline_${slug}_countdown_timecode)`, size: '14', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-				steps: [{ down: [], up: [] }],
-				feedbacks: [],
-			})
-
-			// Countdown feedback – 4 buttons: Hour, Minute, Second, Frame
-			for (const tc of timecodeLabels) {
-				presets.push({
-					type: 'button',
-					category,
-					name: `${name} – Countdown ${tc.title}`,
-					style: { text: tc.label, size: '24', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-					steps: [{ down: [], up: [] }],
-					feedbacks: [{ feedbackId: 'timeline_countdowns', options: {
-						timelinename_feedback: name,
-						show_label: tc.id,
-					} }],
-				})
+				for (const tc of TIMECODE_LABELS) {
+					presets.push({
+						type: 'button',
+						category,
+						name: `${name} – ${sec.varLabel} ${tc.title}`,
+						style: { text: tc.label, size: '24', color: WHITE, bgcolor: BLACK },
+						steps: [{ down: [], up: [] }],
+						feedbacks: [{ feedbackId: sec.feedbackId, options: { timelinename_feedback: name, show_label: tc.id } }],
+					})
+				}
 			}
 		}
 

@@ -1043,6 +1043,8 @@ class Pixera {
 								}
 							}
 
+							self.SELECTEDTIMELINEFEEDBACK = self.CHOICES_TIMELINEFEEDBACK[selIdx]
+
 							// If Pixera returned one or more selected handles, copy the first selected timeline's live values
 							if (Array.isArray(result) && result.length > 0) {
 								const firstSelHandle = result[0]
@@ -1079,6 +1081,9 @@ class Pixera {
 							if (this.variablesHelper && this.variablesHelper.updateVariables) {
 								this.variablesHelper.updateVariables(self)
 							}
+							self.checkFeedbacks('timeline_state_selected')
+							self.checkFeedbacks('timeline_positions_selected')
+							self.checkFeedbacks('timeline_countdowns_selected')
 						}
 					}
 					break;
