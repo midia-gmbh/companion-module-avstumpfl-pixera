@@ -39,8 +39,8 @@ const TIMECODE_SECTIONS = [
 	{ header: 'Timeline Countdown', varSuffix: 'countdown_timecode', varLabel: 'Countdown', feedbackId: 'timeline_countdowns', feedbackIdSelected: 'timeline_countdowns_selected' },
 ]
 
-function stateFb(feedbackId, name, colors) {
-	return { feedbackId, options: { timelinename_feedback: name, ...colors } }
+function stateFb(feedbackId, handle, colors) {
+	return { feedbackId, options: { timelinename_feedback: handle, ...colors } }
 }
 
 module.exports = {
@@ -130,7 +130,7 @@ module.exports = {
 					name: `${name} – ${t.label}`,
 					style: { text: t.icon, size: '60', color: WHITE, bgcolor: BLACK },
 					steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: t.mode, timelinename_state: handle } }], up: [] }],
-					feedbacks: [stateFb('timeline_state', name, { run_fg: t.run_fg, run_bg: t.run_bg, pause_fg: t.pause_fg, pause_bg: t.pause_bg, stop_fg: t.stop_fg, stop_bg: t.stop_bg })],
+					feedbacks: [stateFb('timeline_state', handle, { run_fg: t.run_fg, run_bg: t.run_bg, pause_fg: t.pause_fg, pause_bg: t.pause_bg, stop_fg: t.stop_fg, stop_bg: t.stop_bg })],
 				})
 			}
 			presets.push({
@@ -139,7 +139,7 @@ module.exports = {
 				name: `${name} – State Feedback`,
 				style: { text: '', size: '14', color: WHITE, bgcolor: BLACK },
 				steps: [{ down: [], up: [] }],
-				feedbacks: [stateFb('timeline_state', name, STATE_FEEDBACK_ALL)],
+				feedbacks: [stateFb('timeline_state', handle, STATE_FEEDBACK_ALL)],
 			})
 
 			presets.push({ type: 'text', category, name: 'Cue Navigation', text: 'Jump to the next or previous cue.' })
@@ -173,7 +173,7 @@ module.exports = {
 				name: `${name} – Select`,
 				style: { text: `Select\n$(pixera:timeline_${handle}_name)`, size: '14', color: WHITE, bgcolor: combineRgb(102, 51, 0) },
 				steps: [{ down: [{ actionId: 'timeline_select', options: { timeline_select_timeline: handle } }], up: [] }],
-				feedbacks: [{ feedbackId: 'timeline_selected', options: { timelinename_feedback: name, fg: WHITE, bg: combineRgb(204, 101, 0) } }],
+				feedbacks: [{ feedbackId: 'timeline_selected', options: { timelinename_feedback: handle, fg: WHITE, bg: combineRgb(204, 101, 0) } }],
 			})
 
 			for (const sec of TIMECODE_SECTIONS) {
@@ -193,7 +193,7 @@ module.exports = {
 						name: `${name} – ${sec.varLabel} ${tc.title}`,
 						style: { text: tc.label, size: '24', color: WHITE, bgcolor: BLACK },
 						steps: [{ down: [], up: [] }],
-						feedbacks: [{ feedbackId: sec.feedbackId, options: { timelinename_feedback: name, show_label: tc.id } }],
+						feedbacks: [{ feedbackId: sec.feedbackId, options: { timelinename_feedback: handle, show_label: tc.id } }],
 					})
 				}
 			}

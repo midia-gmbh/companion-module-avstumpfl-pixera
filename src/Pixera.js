@@ -362,13 +362,15 @@ class Pixera {
 						}
 						for (var k = 0; k < self.CHOICES_TIMELINEFEEDBACK.length; k++) {
 							if (self.CHOICES_TIMELINEFEEDBACK[k]['handle'] == handle) {
-								self.CHOICES_TIMELINEFEEDBACK[k]['name'] = result['name']; //set timeline name for feedback
-								self.CHOICES_TIMELINEFEEDBACK[k]['fps'] = result['fps']; //set timeline fps for feedback
+								self.CHOICES_TIMELINEFEEDBACK[k]['name'] = result['name'];
+								self.CHOICES_TIMELINEFEEDBACK[k]['fps'] = result['fps'];
+								self.CHOICES_TIMELINEFEEDBACK[k]['timelineTransport'] = result['mode'];
 							}
 						}
 						self.updateActions();
+						self.initFeedbacks();
 						// names/fps have become available; initialize variable definitions now
-						
+
 						if (variablesHelper.initDefinitions) {
 							variablesHelper.initDefinitions(self);
 						}
@@ -1028,7 +1030,8 @@ class Pixera {
 										}
 									}
 									self.updateActions();
-									
+									self.initFeedbacks();
+
 									if (variablesHelper.initDefinitions) {
 										variablesHelper.initDefinitions(self);
 									}
@@ -1048,7 +1051,8 @@ class Pixera {
 									}
 									// Rebuild so display names in actions, variable defs and presets reflect new name
 									self.updateActions();
-									
+									self.initFeedbacks();
+
 									if (variablesHelper.initDefinitions) {
 										variablesHelper.initDefinitions(self);
 									}
