@@ -171,7 +171,7 @@ module.exports = {
 				type: 'button',
 				category,
 				name: `${name} – Select`,
-				style: { text: `Select\n${name}`, size: '14', color: WHITE, bgcolor: combineRgb(102, 51, 0) },
+				style: { text: `Select\n$(pixera:timeline_${handle}_name)`, size: '14', color: WHITE, bgcolor: combineRgb(102, 51, 0) },
 				steps: [{ down: [{ actionId: 'timeline_select', options: { timeline_select_timeline: handle } }], up: [] }],
 				feedbacks: [{ feedbackId: 'timeline_selected', options: { timelinename_feedback: name, fg: WHITE, bg: combineRgb(204, 101, 0) } }],
 			})
@@ -182,7 +182,7 @@ module.exports = {
 					type: 'button',
 					category,
 					name: `${name} – ${sec.varLabel}`,
-					style: { text: `$(pixera:timeline_${slug}_${sec.varSuffix})`, size: '14', color: WHITE, bgcolor: BLACK },
+					style: { text: `$(pixera:timeline_${handle}_${sec.varSuffix})`, size: '14', color: WHITE, bgcolor: BLACK },
 					steps: [{ down: [], up: [] }],
 					feedbacks: [],
 				})
