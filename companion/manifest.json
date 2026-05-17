@@ -1,9 +1,11 @@
 {
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+	"type": "connection",
 	"id": "avstumpfl-pixera",
 	"name": "avstumpfl-pixera",
 	"shortname": "pixera",
 	"description": "Module to control AVStumpfl Pixera",
-	"version": "3.3.0-midia",
+	"version": "4.0.0-beta",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-avstumpfl-pixera.git",
 	"bugs": "https://github.com/bitfocus/companion-module-avstumpfl-pixera/issues",
@@ -16,7 +18,7 @@
 	],
 	"legacyIds": [],
 	"runtime": {
-		"type": "node18",
+		"type": "node22",
 		"api": "nodejs-ipc",
 		"apiVersion": "0.0.0",
 		"entrypoint": "../index.js"

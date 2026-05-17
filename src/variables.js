@@ -35,7 +35,7 @@ module.exports = {
     try {
       if (!instance) return
 
-      const defs = []
+      const defs = {}
       const values = {}
 
       for (const tl of (instance.CHOICES_TIMELINEFEEDBACK || [])) {
@@ -45,14 +45,14 @@ module.exports = {
         const name = tl.name && tl.name !== '0' ? tl.name : `Timeline_${handle}`
         const p = `timeline_${handle}`
 
-        defs.push({ variableId: `${p}_name`,               name: `${name} - Name` })
-        defs.push({ variableId: `${p}_state`,              name: `${name} - State (numeric)` })
-        defs.push({ variableId: `${p}_state_text`,         name: `${name} - State (text)` })
-        defs.push({ variableId: `${p}_position`,           name: `${name} - Position (frames)` })
-        defs.push({ variableId: `${p}_position_timecode`,  name: `${name} - Position (HH:MM:SS:FF)` })
-        defs.push({ variableId: `${p}_countdown`,          name: `${name} - Countdown (frames)` })
-        defs.push({ variableId: `${p}_countdown_timecode`, name: `${name} - Countdown (HH:MM:SS:FF)` })
-        defs.push({ variableId: `${p}_fps`,                name: `${name} - FPS` })
+        defs[`${p}_name`]               = { name: `${name} - Name` }
+        defs[`${p}_state`]              = { name: `${name} - State (numeric)` }
+        defs[`${p}_state_text`]         = { name: `${name} - State (text)` }
+        defs[`${p}_position`]           = { name: `${name} - Position (frames)` }
+        defs[`${p}_position_timecode`]  = { name: `${name} - Position (HH:MM:SS:FF)` }
+        defs[`${p}_countdown`]          = { name: `${name} - Countdown (frames)` }
+        defs[`${p}_countdown_timecode`] = { name: `${name} - Countdown (HH:MM:SS:FF)` }
+        defs[`${p}_fps`]                = { name: `${name} - FPS` }
 
         values[`${p}_name`]               = name
         values[`${p}_state`]              = 0
@@ -66,14 +66,15 @@ module.exports = {
 
       // Static definitions for the selected timeline (always present)
       const sel = 'timeline_selected'
-      defs.push({ variableId: `${sel}_name`,               name: 'Selected Timeline - Name' })
-      defs.push({ variableId: `${sel}_state`,              name: 'Selected Timeline - State (numeric)' })
-      defs.push({ variableId: `${sel}_state_text`,         name: 'Selected Timeline - State (text)' })
-      defs.push({ variableId: `${sel}_position`,           name: 'Selected Timeline - Position (frames)' })
-      defs.push({ variableId: `${sel}_position_timecode`,  name: 'Selected Timeline - Position (HH:MM:SS:FF)' })
-      defs.push({ variableId: `${sel}_countdown`,          name: 'Selected Timeline - Countdown (frames)' })
-      defs.push({ variableId: `${sel}_countdown_timecode`, name: 'Selected Timeline - Countdown (HH:MM:SS:FF)' })
-      defs.push({ variableId: `${sel}_fps`,                name: 'Selected Timeline - FPS' })
+      defs[`${sel}_handle`]             = { name: 'Selected Timeline - Handle' }
+      defs[`${sel}_name`]               = { name: 'Selected Timeline - Name' }
+      defs[`${sel}_state`]              = { name: 'Selected Timeline - State (numeric)' }
+      defs[`${sel}_state_text`]         = { name: 'Selected Timeline - State (text)' }
+      defs[`${sel}_position`]           = { name: 'Selected Timeline - Position (frames)' }
+      defs[`${sel}_position_timecode`]  = { name: 'Selected Timeline - Position (HH:MM:SS:FF)' }
+      defs[`${sel}_countdown`]          = { name: 'Selected Timeline - Countdown (frames)' }
+      defs[`${sel}_countdown_timecode`] = { name: 'Selected Timeline - Countdown (HH:MM:SS:FF)' }
+      defs[`${sel}_fps`]                = { name: 'Selected Timeline - FPS' }
 
       if (instance.setVariableDefinitions) instance.setVariableDefinitions(defs)
       if (instance.setVariableValues)      instance.setVariableValues(values)
@@ -117,6 +118,7 @@ module.exports = {
       const sPos      = s && s.timelinePositions  ? parseInt(s.timelinePositions)  : 0
       const sCountdown= s && s.timelineCountdowns ? parseInt(s.timelineCountdowns) : 0
       const sState    = s && s.timelineTransport !== undefined ? parseInt(s.timelineTransport) : 0
+      values['timeline_selected_handle']             = s ? s.handle : ''
       values['timeline_selected_name']               = s ? s.name : ''
       values['timeline_selected_state']              = sState
       values['timeline_selected_state_text']         = stateToString(sState)
@@ -142,6 +144,7 @@ module.exports = {
       const sCountdown= s && s.timelineCountdowns ? parseInt(s.timelineCountdowns) : 0
       const sState    = s && s.timelineTransport !== undefined ? parseInt(s.timelineTransport) : 0
       const values = {
+        'timeline_selected_handle':             s ? s.handle : '',
         'timeline_selected_name':               s ? s.name : '',
         'timeline_selected_state':              sState,
         'timeline_selected_state_text':         stateToString(sState),

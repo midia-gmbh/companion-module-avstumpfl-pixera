@@ -1,4 +1,4 @@
-const { InstanceBase, InstanceStatus, runEntrypoint, TCPHelper } = require('@companion-module/base')
+const { InstanceBase, InstanceStatus, TCPHelper } = require('@companion-module/base')
 
 const Pixera = require('./src/Pixera')
 const config = require('./src/config')
@@ -78,4 +78,4 @@ class PixeraInstance extends InstanceBase {
 		}
 	}
 }
-runEntrypoint(PixeraInstance, [])
+module.exports = PixeraInstance
