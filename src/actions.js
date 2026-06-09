@@ -214,7 +214,7 @@ module.exports = {
 					_id = 33;
 					method = 'Pixera.Timelines.Timeline.getCueNext';
 					let blendDuration = parseInt(
-						await self.parseVariablesInString(event.options.blend_name_frames)
+						event.options.blend_name_frames
 					);
 					self.CHOICES_BLENDNAME_FRAMES = blendDuration;
 				}
@@ -278,7 +278,7 @@ module.exports = {
 					_id = 33;
 					method = 'Pixera.Timelines.Timeline.getCuePrevious';
 					let blendDuration = parseInt(
-						await self.parseVariablesInString(event.options.blend_name_frames)
+						event.options.blend_name_frames
 					);
 					self.CHOICES_BLENDNAME_FRAMES = blendDuration;
 				}
@@ -1217,7 +1217,7 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 				let id = opt.resource_settings_general_action;
-				let hdl = await self.parseVariablesInString(opt.resource_settings_general_resource);
+				let hdl = opt.resource_settings_general_resource;
 				let hdlNumber = isNaN(parseInt(hdl)) ? hdl : parseInt(hdl);
 				switch (id) {
 					case 1:
@@ -1328,13 +1328,13 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 				let id = opt.resource_settings_textweb_action;
-				let hdl = await self.parseVariablesInString(opt.resource_settings_textweb_resource);
+				let hdl = opt.resource_settings_textweb_resource;
 				let hdlNumber = isNaN(parseInt(hdl)) ? hdl : parseInt(hdl);
 
 				switch (id) {
 					case 1:
 						{
-							let txt = await self.parseVariablesInString(opt.resource_settings_textweb_text);
+							let txt = opt.resource_settings_textweb_text;
 							self.pixera.sendParams(0, 'Pixera.Resources.Resource.setText', {
 								handle: hdlNumber,
 								text: txt,
@@ -3107,11 +3107,11 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 
-				let hour = parseInt(await self.parseVariablesInString(opt.goto_time_h));
-				let min = parseInt(await self.parseVariablesInString(opt.goto_time_m));
-				let sec = parseInt(await self.parseVariablesInString(opt.goto_time_s));
+				let hour = parseInt(opt.goto_time_h);
+				let min = parseInt(opt.goto_time_m);
+				let sec = parseInt(opt.goto_time_s);
 				let frame = parseInt(
-					await self.parseVariablesInString(opt.goto_time_f)
+					opt.goto_time_f
 				);
 
 				let fps = 60;
@@ -3185,7 +3185,7 @@ module.exports = {
 				}
 				self.pixera.sendParams(0, 'Pixera.Compound.applyCueOnTimeline', {
 					timelineName: timelineName,
-					cueName: await self.parseVariablesInString(opt.cue_name),
+					cueName: opt.cue_name,
 				});
 			},
 		};
@@ -3215,10 +3215,10 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 				let indexTl = parseInt(
-					await self.parseVariablesInString(opt.timelinecue_index)
+					opt.timelinecue_index
 				);
 				let indexCue = parseInt(
-					await self.parseVariablesInString(opt.cue_index)
+					opt.cue_index
 				);
 				self.pixera.sendParams(
 					0,
@@ -3273,12 +3273,12 @@ module.exports = {
 				let opt = event.options;
 
 				let hour = parseInt(
-					await self.parseVariablesInString(opt.blend_time_h)
+					opt.blend_time_h
 				);
-				let min = parseInt(await self.parseVariablesInString(opt.blend_time_m));
-				let sec = parseInt(await self.parseVariablesInString(opt.blend_time_s));
+				let min = parseInt(opt.blend_time_m);
+				let sec = parseInt(opt.blend_time_s);
 				let frame = parseInt(
-					await self.parseVariablesInString(opt.blend_time_f)
+					opt.blend_time_f
 				);
 
 				let fps = 60;
@@ -3292,7 +3292,7 @@ module.exports = {
 					}
 				}
 				let blendDuration = parseInt(
-					await self.parseVariablesInString(opt.blend_time_frames)
+					opt.blend_time_frames
 				);
 				let time =
 					hour * 60 * 60 * parseInt(fps) +
@@ -3345,9 +3345,9 @@ module.exports = {
 				self.CHOICES_BLENDNAME_TIMELINE = parseInt(
 					opt.timelinename_blendcuename
 				);
-				let cueName = await self.parseVariablesInString(opt.blend_cue_name);
+				let cueName = opt.blend_cue_name;
 				let blendDuration = parseInt(
-					await self.parseVariablesInString(opt.blend_name_frames)
+					opt.blend_name_frames
 				);
 				self.CHOICES_BLENDNAME_FRAMES = blendDuration;
 				if (event.options.timelinename_blendcuename == -1) {
@@ -3395,7 +3395,7 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 				let val = parseFloat(
-					await self.parseVariablesInString(opt.timeline_opacity)
+					opt.timeline_opacity
 				);
 				if (event.options.timelinename_timelineopacity == -1) {
 					for (let i = 0; i < self.SELECTEDTIMELINES.length; i++) {
@@ -3433,7 +3433,7 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 				let val = parseInt(
-					await self.parseVariablesInString(opt.timeline_scrubcurrenttime_frames)
+					opt.timeline_scrubcurrenttime_frames
 				);
 				if (event.options.timeline_scrubcurrenttime_timeline == -1) {
 					for (let i = 0; i < self.SELECTEDTIMELINES.length; i++) {
@@ -3480,7 +3480,7 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 				let val = parseFloat(
-					await self.parseVariablesInString(opt.timeline_zoomfactor_factor)
+					opt.timeline_zoomfactor_factor
 				);
 				if (event.options.timeline_zoomfactor_timeline == -1) {
 					for (let i = 0; i < self.SELECTEDTIMELINES.length; i++) {
@@ -3694,16 +3694,16 @@ module.exports = {
 					}
 				} else {
 					let hour = parseInt(
-						await self.parseVariablesInString(opt.timeline_create_cue_h)
+						opt.timeline_create_cue_h
 					);
 					let min = parseInt(
-						await self.parseVariablesInString(opt.timeline_create_cue_m)
+						opt.timeline_create_cue_m
 					);
 					let sec = parseInt(
-						await self.parseVariablesInString(opt.timeline_create_cue_s)
+						opt.timeline_create_cue_s
 					);
 					let frame = parseInt(
-						await self.parseVariablesInString(opt.timeline_create_cue_f)
+						opt.timeline_create_cue_f
 					);
 
 					let fps = 60;
@@ -4093,7 +4093,7 @@ module.exports = {
 			callback: async (event) => {
 				let opt = event.options;
 				let args = [];
-				let argString = await self.parseVariablesInString(opt.controlArguments);
+				let argString = opt.controlArguments;
 
 				const tempArgs = (argString + '')
 					.replace(/“/g, '"')
@@ -4142,7 +4142,7 @@ module.exports = {
 			],
 			callback: async (event) => {
 				let opt = event.options;
-				let tempApiCmd = await self.parseVariablesInString(opt.api_methode);
+				let tempApiCmd = opt.api_methode;
 				try {
 					let apiCmd = JSON.parse(tempApiCmd);
 					self.pixera.sendParams(9999, apiCmd['method'], apiCmd['params']);
