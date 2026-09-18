@@ -61,13 +61,13 @@ class Pixera {
 					self.retry_interval = setInterval(
 						this.retry.bind(this),
 						config.polling_rate
-					); //ms for pool timelinestate
+					); //ms for poll timelinestate
 					this.retry();
 				}
 				self.getSelectedTimelines = setInterval(
 					this.getSelectedTimeline.bind(this),
 					100
-				); //ms for pool selected Timelines
+				); //ms for poll selected Timelines
 				this.getSelectedTimeline();
 			});
 			let currentLength = 0;
@@ -211,7 +211,7 @@ class Pixera {
 			self.log('error', 'Pixera not connected. Can not send command');
 		}
 	}
-	pool() {
+	poll() {
 		let self = this.instance;
 		this.send(10000, 'Pixera.Utility.pollMonitoring');
 	}
@@ -221,7 +221,7 @@ class Pixera {
 	}
 	retry() {
 		let self = this.instance;
-		this.pool();
+		this.poll();
 	}
 	initLiveSystems() {
 		let self = this.instance;

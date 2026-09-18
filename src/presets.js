@@ -65,7 +65,7 @@ module.exports = {
 		for (const t of TRANSPORT_MODES) {
 			addPreset(presetsObj, selTransportGroup, `sel_transport_${t.mode}`, {
 				name: `Selected – ${t.label}`,
-				style: { text: t.icon, size: '60', color: WHITE, bgcolor: BLACK },
+				style: { text: t.icon, size: 'auto', color: WHITE, bgcolor: BLACK },
 				steps: [{ down: [{ actionId: 'timeline_transport', options: { mode: t.mode, timelinename_state: -1 } }], up: [] }],
 				feedbacks: [{ feedbackId: 'timeline_state_selected', options: { run_fg: t.run_fg, run_bg: t.run_bg, pause_fg: t.pause_fg, pause_bg: t.pause_bg, stop_fg: t.stop_fg, stop_bg: t.stop_bg } }],
 			})
