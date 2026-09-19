@@ -1,4 +1,8 @@
 const { combineRgb } = require('@companion-module/base')
+const cues = require('./cues')
+
+// Cue buttons are generated per cue; cap them so huge shows don't flood the preset browser
+const MAX_CUE_PRESETS_PER_TIMELINE = 128
 
 const WHITE = combineRgb(255, 255, 255)
 const BLACK = combineRgb(0, 0, 0)
@@ -39,6 +43,36 @@ const TIMECODE_SECTIONS = [
 	{ header: 'Timeline Countdown',  varSuffix: 'countdown_timecode', varLabel: 'Countdown', feedbackId: 'timeline_countdowns', feedbackIdSelected: 'timeline_countdowns_selected' },
 ]
 
+const CUE_INFO_BUTTONS = [
+	{ suffix: 'cue_current_name',            title: 'Current Cue',  caption: 'Cue' },
+	{ suffix: 'cue_next_name',               title: 'Next Cue',     caption: 'Next' },
+	{ suffix: 'cue_next_remaining_timecode', title: 'To Next Cue',  caption: 'To Next' },
+	{ suffix: 'cue_count',                   title: 'Cue Count',    caption: 'Cues' },
+]
+
+const CUE_BUTTON_BG = combineRgb(0, 51, 102)
+const CUE_ACTIVE_BG = combineRgb(0, 102, 204)
+const CUE_BLEND_BG = combineRgb(51, 0, 102)
+
+// Display buttons for current/next/previous cue, used for a timeline and for 'selected'
+function cueInfoGroup(presetsObj, groupId, groupName, varPrefix, displayName) {
+	const group = makeGroup(groupId, groupName, 'Current and next cue of this timeline.')
+	for (const b of CUE_INFO_BUTTONS) {
+		addPreset(presetsObj, group, `${groupId}_${b.suffix}`, {
+			name: `${displayName} – ${b.title}`,
+			style: {
+				text: `${b.caption}\n$(pixera:${varPrefix}_${b.suffix})`,
+				size: '14',
+				color: WHITE,
+				bgcolor: BLACK,
+			},
+			steps: [{ down: [], up: [] }],
+			feedbacks: [],
+		})
+	}
+	return group
+}
+
 function stateFb(feedbackId, handle, colors) {
 	return { feedbackId, options: { timelinename_feedback: handle, ...colors } }
 }
@@ -52,11 +86,36 @@ function addPreset(presetsObj, group, id, def) {
 	group.presets.push(id)
 }
 
+/*
+  Cue navigation buttons for one timeline handle (-1 = selected timeline): jump to the next or
+  previous cue, and the same again as a blend using the configured default blendtime.
+*/
+function cueNavGroup(presetsObj, groupId, displayName, handle, blendtime) {
+	const group = makeGroup(groupId, 'Cue Navigation', 'Jump or blend to the next or previous cue.')
+	for (const c of CUE_MODES) {
+		addPreset(presetsObj, group, `${groupId}_${c.actionId}`, {
+			name: `${displayName} – ${c.label}`,
+			style: { text: c.icon, size: '60', color: WHITE, bgcolor: BLUE_DARK },
+			steps: [{ down: [{ actionId: c.actionId, options: { [c.optKey]: handle, [`${c.optKey}_ignore`]: false, [`${c.optKey}_blend`]: false, blend_name_frames: blendtime } }], up: [] }],
+			feedbacks: [],
+		})
+		addPreset(presetsObj, group, `${groupId}_${c.actionId}_blend`, {
+			name: `${displayName} – Blend to ${c.label}`,
+			style: { text: `${c.icon}\nBlend`, size: '14', color: WHITE, bgcolor: BLUE_DARK },
+			steps: [{ down: [{ actionId: c.actionId, options: { [c.optKey]: handle, [`${c.optKey}_ignore`]: false, [`${c.optKey}_blend`]: true, blend_name_frames: blendtime } }], up: [] }],
+			feedbacks: [],
+		})
+	}
+	return group
+}
+
 module.exports = {
 	updatePresets() {
 		const self = this
 		const sections = []
 		const presetsObj = {}
+		const blendtimeRaw = parseInt(self.config ? self.config.blendtime_default : NaN)
+		const blendtime = isNaN(blendtimeRaw) ? 60 : blendtimeRaw
 
 		// --- Selected Timeline ---
 		const selSection = { id: 'selected_timeline', name: 'Selected Timeline', definitions: [] }
@@ -78,16 +137,13 @@ module.exports = {
 		})
 		selSection.definitions.push(selTransportGroup)
 
-		const selCueGroup = makeGroup('sel_cue', 'Cue Navigation', 'Jump to the next or previous cue on the selected timeline.')
-		for (const c of CUE_MODES) {
-			addPreset(presetsObj, selCueGroup, `sel_cue_${c.actionId}`, {
-				name: `Selected – ${c.label}`,
-				style: { text: c.icon, size: '60', color: WHITE, bgcolor: BLUE_DARK },
-				steps: [{ down: [{ actionId: c.actionId, options: { [c.optKey]: -1, [`${c.optKey}_ignore`]: false, [`${c.optKey}_blend`]: false, blend_name_frames: 60 } }], up: [] }],
-				feedbacks: [],
-			})
-		}
-		selSection.definitions.push(selCueGroup)
+		selSection.definitions.push(
+			cueNavGroup(presetsObj, 'sel_cue', 'Selected', -1, blendtime)
+		)
+
+		selSection.definitions.push(
+			cueInfoGroup(presetsObj, 'sel_cue_info', 'Cue Info', 'timeline_selected', 'Selected')
+		)
 
 		const selFadeGroup = makeGroup('sel_fade', 'Fade', 'Fade the selected timeline in or out.')
 		for (const f of FADE_MODES) {
@@ -144,16 +200,45 @@ module.exports = {
 			})
 			tlSection.definitions.push(transportGroup)
 
-			const cueGroup = makeGroup(`tl_${h}_cue`, 'Cue Navigation', 'Jump to the next or previous cue.')
-			for (const c of CUE_MODES) {
-				addPreset(presetsObj, cueGroup, `tl_${h}_cue_${c.actionId}`, {
-					name: `${name} – ${c.label}`,
-					style: { text: c.icon, size: '60', color: WHITE, bgcolor: BLUE_DARK },
-					steps: [{ down: [{ actionId: c.actionId, options: { [c.optKey]: handle, [`${c.optKey}_ignore`]: false, [`${c.optKey}_blend`]: false, blend_name_frames: 60 } }], up: [] }],
-					feedbacks: [],
-				})
+			tlSection.definitions.push(
+				cueNavGroup(presetsObj, `tl_${h}_cue`, name, handle, blendtime)
+			)
+
+			tlSection.definitions.push(
+				cueInfoGroup(presetsObj, `tl_${h}_cue_info`, 'Cue Info', `timeline_${handle}`, name)
+			)
+
+			// one button per cue of this timeline
+			const cueList = cues.getCuesOfTimeline(self, handle)
+			if (cueList.length > 0) {
+				const shown = cueList.slice(0, MAX_CUE_PRESETS_PER_TIMELINE)
+				if (cueList.length > shown.length && self.log) {
+					self.log(
+						'info',
+						`Timeline "${name}" has ${cueList.length} cues, only the first ${shown.length} are offered as presets`
+					)
+				}
+				const cueListGroup = makeGroup(`tl_${h}_cue_list`, 'Cues', 'Jump to a specific cue of this timeline.')
+				const cueBlendGroup = makeGroup(`tl_${h}_cue_blend`, 'Blend to Cue', `Blend to a specific cue of this timeline, using ${blendtime} frames.`)
+				for (const cue of shown) {
+					const cueName = cues.cueLabel(cue)
+					const currentFb = { feedbackId: 'cue_is_current', options: { timelinename_feedback: handle, [`cue_feedback_${handle}`]: cueName, cue_feedback: cueName, fg: WHITE, bg: CUE_ACTIVE_BG } }
+					addPreset(presetsObj, cueListGroup, `tl_${h}_cue_${cue.handle}`, {
+						name: `${name} – ${cueName}`,
+						style: { text: cueName, size: '14', color: WHITE, bgcolor: CUE_BUTTON_BG },
+						steps: [{ down: [{ actionId: 'goto_cue_name', options: { timelinename_cuename: handle, [`cue_name_${handle}`]: cueName, cue_name: cueName } }], up: [] }],
+						feedbacks: [currentFb],
+					})
+					addPreset(presetsObj, cueBlendGroup, `tl_${h}_cue_blend_${cue.handle}`, {
+						name: `${name} – Blend to ${cueName}`,
+						style: { text: `Blend\n${cueName}`, size: '14', color: WHITE, bgcolor: CUE_BLEND_BG },
+						steps: [{ down: [{ actionId: 'blend_cue_name', options: { timelinename_blendcuename: handle, [`blend_cue_name_${handle}`]: cueName, blend_cue_name: cueName, blend_name_frames: blendtime } }], up: [] }],
+						feedbacks: [currentFb],
+					})
+				}
+				tlSection.definitions.push(cueListGroup)
+				tlSection.definitions.push(cueBlendGroup)
 			}
-			tlSection.definitions.push(cueGroup)
 
 			const fadeGroup = makeGroup(`tl_${h}_fade`, 'Fade', 'Fade this timeline in or out.')
 			for (const f of FADE_MODES) {

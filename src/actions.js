@@ -1,9 +1,35 @@
 const { InstanceStatus } = require('@companion-module/base');
 const { forEach } = require('lodash');
+const cues = require('./cues');
+
+/*
+  Timeline dropdowns use the handle -1 to mean "whatever is selected in Pixera".
+  Returns the handles an action has to act on.
+*/
+function resolveTimelineHandles(instance, option) {
+	if (option == -1) return (instance.SELECTEDTIMELINES || []).slice();
+	const handle = parseInt(option);
+	return isNaN(handle) ? [] : [handle];
+}
+
+function timelineNameOf(instance, handle) {
+	const tl = (instance.CHOICES_TIMELINEFEEDBACK || []).find(
+		(t) => t.handle == handle
+	);
+	return tl && tl.name && tl.name !== '0' ? tl.name : '';
+}
+
+//default blendtime from the instance config, used to pre-fill the blend actions
+function defaultBlendtime(instance) {
+	const value = parseInt(instance && instance.config ? instance.config.blendtime_default : NaN);
+	return isNaN(value) ? 60 : value;
+}
+
 module.exports = {
 	updateActions() {
 		let self = this;
 		let actions = {};
+		let blendtime = defaultBlendtime(self);
 
 		actions.timeline_transport = {
 			name: 'Timeline Transport',
@@ -201,7 +227,7 @@ module.exports = {
 					label: 'Blendtime in Frames',
 					id: 'blend_name_frames',
 					isVisibleExpression: "$(options:timelinename_next_blend) == true",
-					default: 60.0,
+					default: blendtime,
 					regex: self.REGEX_FLOAT,
 				},
 			],
@@ -263,7 +289,7 @@ module.exports = {
 					label: 'Blendtime in Frames',
 					id: 'blend_name_frames',
 					isVisibleExpression: "$(options:timelinename_prev_blend) == true",
-					default: 60.0,
+					default: blendtime,
 					regex: self.REGEX_FLOAT,
 				},
 			],
@@ -3163,30 +3189,37 @@ module.exports = {
 					id: 'timelinename_cuename',
 					default: 0,
 					choices: self.CHOICES_TIMELINENAME,
+					//required so the cue dropdowns below can react to this field
+					disableAutoExpression: true,
 				},
-				{
-					type: 'textinput',
-					label: 'Cue Name',
-					id: 'cue_name',
-					default: '',
-				},
+				...cues.cueOptionFields(self, 'timelinename_cuename', 'cue_name', 'Cue Name'),
 			],
 			callback: async (event) => {
 				let opt = event.options;
-				let timelineName = '';
-				for (let k = 0; k < self.CHOICES_TIMELINEFEEDBACK.length; k++) {
-					if (
-						self.CHOICES_TIMELINEFEEDBACK[k]['handle'] ==
-						opt.timelinename_cuename
-					) {
-						timelineName = self.CHOICES_TIMELINEFEEDBACK[k]['name'];
-						break;
+				//the configured cue is a name; it is looked up per timeline when the action runs,
+				//so 'Selected Timeline' always hits that name on whatever is selected right now
+				let cueName = cues.readCueOption(
+					opt,
+					'cue_name',
+					opt.timelinename_cuename
+				);
+				for (const handle of resolveTimelineHandles(
+					self,
+					opt.timelinename_cuename
+				)) {
+					//prefer the cached cue, that also covers unnamed and duplicate cue names
+					let cue = cues.findCueByLabel(self, handle, cueName);
+					if (cue) {
+						self.pixera.sendParams(0, 'Pixera.Timelines.Cue.apply', {
+							handle: cue.handle,
+						});
+						continue;
 					}
+					self.pixera.sendParams(0, 'Pixera.Compound.applyCueOnTimeline', {
+						timelineName: timelineNameOf(self, handle),
+						cueName: cueName,
+					});
 				}
-				self.pixera.sendParams(0, 'Pixera.Compound.applyCueOnTimeline', {
-					timelineName: timelineName,
-					cueName: opt.cue_name,
-				});
 			},
 		};
 
@@ -3266,7 +3299,7 @@ module.exports = {
 					type: 'textinput',
 					label: 'Blendtime in Frames',
 					id: 'blend_time_frames',
-					default: '0',
+					default: String(blendtime),
 				},
 			],
 			callback: async (event) => {
@@ -3326,47 +3359,56 @@ module.exports = {
 					id: 'timelinename_blendcuename',
 					default: 0,
 					choices: self.CHOICES_TIMELINENAME,
+					//required so the cue dropdowns below can react to this field
+					disableAutoExpression: true,
 				},
-				{
-					type: 'textinput',
-					label: 'Cue Name',
-					id: 'blend_cue_name',
-					default: '',
-				},
+				...cues.cueOptionFields(
+					self,
+					'timelinename_blendcuename',
+					'blend_cue_name',
+					'Cue Name'
+				),
 				{
 					type: 'textinput',
 					label: 'Blendtime in Frames',
 					id: 'blend_name_frames',
-					default: 0,
+					default: blendtime,
 				},
 			],
 			callback: async (event) => {
 				let opt = event.options;
-				self.CHOICES_BLENDNAME_TIMELINE = parseInt(
+				let blendFrames = parseInt(opt.blend_name_frames);
+				self.CHOICES_BLENDNAME_FRAMES = blendFrames;
+				//the configured cue is a name; it is looked up per timeline when the action runs,
+				//so 'Selected Timeline' always blends to that name on whatever is selected right now
+				let cueName = cues.readCueOption(
+					opt,
+					'blend_cue_name',
 					opt.timelinename_blendcuename
 				);
-				let cueName = opt.blend_cue_name;
-				let blendDuration = parseInt(
-					opt.blend_name_frames
-				);
-				self.CHOICES_BLENDNAME_FRAMES = blendDuration;
-				if (event.options.timelinename_blendcuename == -1) {
-					for (let i = 0; i < self.SELECTEDTIMELINES.length; i++) {
-						self.pixera.sendParams(
-							33,
-							'Pixera.Timelines.Timeline.getCueFromName',
-							{
-								handle: self.SELECTEDTIMELINES[i],
-								name: cueName,
-							}
+				for (const handle of resolveTimelineHandles(
+					self,
+					opt.timelinename_blendcuename
+				)) {
+					//prefer the cached cue, that also covers unnamed and duplicate cue names
+					let cue = cues.findCueByLabel(self, handle, cueName);
+					if (cue) {
+						let tl = (self.CHOICES_TIMELINEFEEDBACK || []).find(
+							(t) => t.handle == handle
 						);
+						let fps = tl && parseInt(tl.fps) > 0 ? parseInt(tl.fps) : 60;
+						self.pixera.sendParams(0, 'Pixera.Timelines.Cue.blendToThis', {
+							handle: cue.handle,
+							blendDuration: blendFrames / fps,
+						});
+						continue;
 					}
-				} else {
+					//fall back to resolving the name in Pixera, finished by the id 33 handler
 					self.pixera.sendParams(
 						33,
 						'Pixera.Timelines.Timeline.getCueFromName',
 						{
-							handle: parseInt(opt.timelinename_blendcuename),
+							handle: handle,
 							name: cueName,
 						}
 					);

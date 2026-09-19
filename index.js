@@ -45,7 +45,8 @@ class PixeraInstance extends InstanceBase {
 		self.CHOICES_SCREENNAME = [{label: '',id:0}];
 		self.CHOICES_SCREENHANDLE = [];
 		self.CHOICES_CUENAME = [];
-		self.CHOICES_CUEHANDLE = [];
+		self.CUES = {};
+		self.CUESBYTIMELINE = {};
 		self.CHOICES_FADELIST = [];
 
 		self.INDEX_LIVESYSTEM = 0;

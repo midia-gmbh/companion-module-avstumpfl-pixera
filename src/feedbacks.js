@@ -1,4 +1,5 @@
 const { combineRgb } = require('@companion-module/base')
+const cues = require('./cues')
 module.exports = {
 	initFeedbacks() {
 		
@@ -248,6 +249,84 @@ module.exports = {
 					if (val !== undefined) return { text: val.toString() }
 				}
 			},
+			cue_is_current: {
+				type: 'advanced',
+				name: 'Change color when Cue is the current Cue',
+				options: [
+				{
+					type: 'dropdown',
+					label: 'Timeline',
+					id: 'timelinename_feedback',
+					default: 0,
+					choices: (self.CHOICES_TIMELINENAME || []).filter(c => c.id !== 0 && c.id !== -1),
+					//required so the cue dropdowns below can react to this field
+					disableAutoExpression: true,
+				},
+				...cues.cueOptionFields(self, 'timelinename_feedback', 'cue_feedback', 'Cue Name'),
+				{
+					type: 'colorpicker',
+					label: 'Foreground color',
+					id: 'fg',
+					default: combineRgb(255, 255, 255),
+				},
+				{
+					type: 'colorpicker',
+					label: 'Background color',
+					id: 'bg',
+					default: combineRgb(0, 102, 204),
+				},
+				],
+				callback: function(feedback) {
+					const tlHandle = feedback.options.timelinename_feedback
+					const cueName = cues.readCueOption(feedback.options, 'cue_feedback', tlHandle)
+					const cue = cues.findCueByLabel(self, tlHandle, cueName)
+					if (!cue) return
+					const tl = (self.CHOICES_TIMELINEFEEDBACK || []).find(t => t.handle == feedback.options.timelinename_feedback)
+					if (!tl) return
+					if (tl.cueCurrent === cue.handle) {
+						return { color: feedback.options.fg, bgcolor: feedback.options.bg }
+					}
+				}
+			},//close cue is current
+			cue_is_next: {
+				type: 'advanced',
+				name: 'Change color when Cue is the next Cue',
+				options: [
+				{
+					type: 'dropdown',
+					label: 'Timeline',
+					id: 'timelinename_feedback',
+					default: 0,
+					choices: (self.CHOICES_TIMELINENAME || []).filter(c => c.id !== 0 && c.id !== -1),
+					//required so the cue dropdowns below can react to this field
+					disableAutoExpression: true,
+				},
+				...cues.cueOptionFields(self, 'timelinename_feedback', 'cue_feedback', 'Cue Name'),
+				{
+					type: 'colorpicker',
+					label: 'Foreground color',
+					id: 'fg',
+					default: combineRgb(0, 0, 0),
+				},
+				{
+					type: 'colorpicker',
+					label: 'Background color',
+					id: 'bg',
+					default: combineRgb(255, 255, 0),
+				},
+				],
+				callback: function(feedback) {
+					const tlHandle = feedback.options.timelinename_feedback
+					const cueName = cues.readCueOption(feedback.options, 'cue_feedback', tlHandle)
+					const cue = cues.findCueByLabel(self, tlHandle, cueName)
+					if (!cue) return
+					const tl = (self.CHOICES_TIMELINEFEEDBACK || []).find(t => t.handle == feedback.options.timelinename_feedback)
+					if (!tl) return
+					if (tl.cueNext === cue.handle) {
+						return { color: feedback.options.fg, bgcolor: feedback.options.bg }
+					}
+				}
+			},//close cue is next
 			timeline_countdowns_selected: {
 				type: 'advanced',
 				name: 'Change Text from Selected Timeline Countdown',

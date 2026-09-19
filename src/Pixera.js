@@ -3,6 +3,14 @@ const { debug } = require('console');
 const { forEach } = require('lodash');
 const { isIP } = require('net');
 const variablesHelper = require('./variables');
+const cuesHelper = require('./cues');
+
+const MONITORING_SUBJECTS_CUES = [
+	'cueAdded',
+	'cueChanged',
+	'cueRemoved',
+	'cueApplied',
+];
 
 class Pixera {
 	constructor(instance, config) {
@@ -44,6 +52,12 @@ class Pixera {
 				this.sendParams(99, 'Pixera.Utility.setShowContextInReplies', {
 					doShow: true,
 				});
+				//make sure the cue subjects are part of the monitoring for this connection
+				for (const subject of MONITORING_SUBJECTS_CUES) {
+					this.sendParams(65, 'Pixera.Utility.subscribeMonitoringSubject', {
+						subject: subject,
+					});
+				}
 				self.initFeedbacks();
 				this.initVariables();
 				this.initLiveSystems();
@@ -140,6 +154,14 @@ class Pixera {
 		let self = this.instance;
 		clearInterval(self.retry_interval);
 		clearInterval(self.getSelectedTimelines);
+		if (this.rebuild_timer) {
+			clearTimeout(this.rebuild_timer);
+			this.rebuild_timer = null;
+		}
+		if (this.cue_resync_timer) {
+			clearTimeout(this.cue_resync_timer);
+			this.cue_resync_timer = null;
+		}
 		if (this.socket) {
 			this.socket.destroy();
 			delete this.socket;
@@ -211,6 +233,67 @@ class Pixera {
 			self.log('error', 'Pixera not connected. Can not send command');
 		}
 	}
+	/*
+	  Rebuilding actions, feedbacks, variable definitions and presets is expensive and every
+	  timeline/cue reply would otherwise trigger a full rebuild. Coalesce them into one run.
+	*/
+	scheduleRebuild() {
+		let self = this.instance;
+		if (this.rebuild_timer) return;
+		this.rebuild_timer = setTimeout(() => {
+			this.rebuild_timer = null;
+			try {
+				cuesHelper.rebuildCueChoices(self);
+				self.updateActions();
+				self.initFeedbacks();
+				if (variablesHelper.initDefinitions) {
+					variablesHelper.initDefinitions(self);
+				}
+				if (self.updatePresets) {
+					self.updatePresets();
+				}
+			} catch (e) {
+				self.log('error', 'rebuild failed: ' + e.message);
+			}
+		}, 250);
+	}
+	initCues(timelineHandle) {
+		this.sendParams(61, 'Pixera.Timelines.Timeline.getCues', {
+			handle: timelineHandle,
+		});
+	}
+	/*
+	  Re-read the whole cue list of a timeline. Monitoring only tells us which cue handles
+	  changed, not where they sit, so after any add/remove the order and the indices have to
+	  come from Pixera again. Coalesced, because one edit usually touches several cues.
+	*/
+	scheduleCueResync(timelineHandle) {
+		if (timelineHandle === null || timelineHandle === undefined) return;
+		if (!this.pending_cue_resync) this.pending_cue_resync = new Set();
+		this.pending_cue_resync.add(timelineHandle);
+		if (this.cue_resync_timer) return;
+		this.cue_resync_timer = setTimeout(() => {
+			this.cue_resync_timer = null;
+			const handles = Array.from(this.pending_cue_resync);
+			this.pending_cue_resync.clear();
+			for (const h of handles) {
+				this.initCues(h);
+			}
+		}, 150);
+	}
+	//ask Pixera which timeline a cue belongs to, plus its attributes and time
+	resolveCue(cueHandle) {
+		this.sendParams(64, 'Pixera.Timelines.Cue.getTimeline', {
+			handle: cueHandle,
+		});
+		this.requestCueDetails(cueHandle);
+	}
+	requestCueDetails(cueHandle) {
+		this.sendParams(62, 'Pixera.Timelines.Cue.getAttributes', {
+			handle: cueHandle,
+		});
+		this.sendParams(63, 'Pixera.Timelines.Cue.getTime', { handle: cueHandle });
+	}
 	poll() {
 		let self = this.instance;
 		this.send(10000, 'Pixera.Utility.pollMonitoring');
@@ -280,7 +363,8 @@ class Pixera {
 		self.CHOICES_SCREENNAME = [{ label: '', id: 0 }];
 		self.CHOICES_SCREENHANDLE = [];
 		self.CHOICES_CUENAME = [];
-		self.CHOICES_CUEHANDLE = [];
+		self.CUES = {};
+		self.CUESBYTIMELINE = {};
 		self.CHOICES_FADELIST = [];
 		self.SELECTEDTIMELINES = [];
 
@@ -329,6 +413,10 @@ class Pixera {
 								timelineCountdowns: '0',
 								name: '0',
 								fps: '0',
+								cueApplied: null,
+								cueCurrent: null,
+								cueNext: null,
+								cuePrev: null,
 							}); //set timeline variable for feedback
 							//get attributes for each timeline
 							this.sendParams(12, 'Pixera.Timelines.Timeline.getAttributes', {
@@ -367,16 +455,13 @@ class Pixera {
 								self.CHOICES_TIMELINEFEEDBACK[k]['timelineTransport'] = result['mode'];
 							}
 						}
-						self.updateActions();
-						self.initFeedbacks();
-						// names/fps have become available; initialize variable definitions now
-
-						if (variablesHelper.initDefinitions) {
-							variablesHelper.initDefinitions(self);
+						//the cues of this timeline are loaded once, then kept in sync via monitoring
+						if (handle != -1) {
+							this.initCues(handle);
 						}
-						if (self.updatePresets) {
-							self.updatePresets();
-						}
+						// names/fps have become available; rebuild actions, feedbacks,
+						// variable definitions and presets (coalesced)
+						this.scheduleRebuild();
 					}
 					break;
 				case 13: //Pixera.Screens.getScreens
@@ -904,6 +989,91 @@ class Pixera {
 					});
 					break;
 
+					//---------cues start ----------
+				case 61: //Pixera.Timelines.Timeline.getCues
+					{
+						let result = jsonData.result;
+						let timelineHandle = jsonData.context
+							? jsonData.context['handle']
+							: null;
+						if (result != null && timelineHandle != null) {
+							//authoritative list: adds new cues, fixes the order, drops deleted ones
+							const unresolved = cuesHelper.syncTimelineCues(
+								self,
+								timelineHandle,
+								result
+							);
+							for (const cueHandle of unresolved) {
+								this.requestCueDetails(cueHandle);
+							}
+							cuesHelper.recomputePointers(self);
+							this.scheduleRebuild();
+						}
+					}
+					break;
+				case 62: //Pixera.Timelines.Cue.getAttributes
+					{
+						let result = jsonData.result;
+						let cueHandle = jsonData.context
+							? jsonData.context['handle']
+							: null;
+						if (result != null && cueHandle != null) {
+							cuesHelper.upsertCue(self, cueHandle, {
+								name: result['name'],
+								index: result['index'],
+								operation: result['operation'],
+								number: result['number'],
+								numberFormatted: result['numberFormatted'],
+								waitDuration: result['waitDuration'],
+								note: result['note'],
+							});
+							this.scheduleRebuild();
+						}
+					}
+					break;
+				case 63: //Pixera.Timelines.Cue.getTime
+					{
+						let result = jsonData.result;
+						let cueHandle = jsonData.context
+							? jsonData.context['handle']
+							: null;
+						if (result != null && cueHandle != null) {
+							cuesHelper.upsertCue(self, cueHandle, { time: result });
+							cuesHelper.recomputePointers(self);
+							this.scheduleRebuild();
+						}
+					}
+					break;
+				case 64: //Pixera.Timelines.Cue.getTimeline
+					{
+						let result = jsonData.result;
+						let cueHandle = jsonData.context
+							? jsonData.context['handle']
+							: null;
+						if (result != null && cueHandle != null) {
+							cuesHelper.upsertCue(self, cueHandle, {
+								timelineHandle: result,
+							});
+							//re-read the timeline's cue list so order and indices are correct again
+							this.scheduleCueResync(result);
+							cuesHelper.recomputePointers(self);
+							this.scheduleRebuild();
+						}
+					}
+					break;
+				case 65: //Pixera.Utility.subscribeMonitoringSubject
+					{
+						if (jsonData.result === false) {
+							self.log(
+								'warn',
+								'Pixera refused a monitoring subscription: ' +
+									JSON.stringify(jsonData.context)
+							);
+						}
+					}
+					break;
+					//---------cues end ----------
+
 
 				/*
         case 51: //Pixera.Resources.getTranscodingFolders
@@ -987,6 +1157,9 @@ class Pixera {
 											) {
 												self.CHOICES_TIMELINEFEEDBACK[t]['timelineCountdowns'] =
 													timelineCountdowns[b]['value'];
+												//flag 1 = counting down to the next cue, 2 = cue wait duration
+												self.CHOICES_TIMELINEFEEDBACK[t]['countdownFlag'] =
+													timelineCountdowns[b]['flag'];
 												self.checkFeedbacks('timeline_countdowns');
 												//self.log('debug', 'countdowns:',self.CHOICES_TIMELINEFEEDBACK);
 											}
@@ -1011,11 +1184,15 @@ class Pixera {
 												timelineCountdowns: '0',
 												name: '0',
 												fps: '0',
+												cueApplied: null,
+												cueCurrent: null,
+												cueNext: null,
+												cuePrev: null,
 											});
 											this.sendParams(12, 'Pixera.Timelines.Timeline.getAttributes', { handle: newHandle });
 										}
 									}
-									self.updateActions();
+									this.scheduleRebuild();
 								} else if (result[c]['name'] == 'timelineRemoved') {
 									for (var b = 0; b < result[c]['entries'].length; b++) {
 										var removedHandles = result[c]['entries'][b]['handles'] || [];
@@ -1027,15 +1204,10 @@ class Pixera {
 											if (self.SELECTEDTIMELINEFEEDBACK && self.SELECTEDTIMELINEFEEDBACK.handle === removedHandle) {
 												self.SELECTEDTIMELINEFEEDBACK = null;
 											}
+											cuesHelper.removeCuesOfTimeline(self, removedHandle);
 										}
 									}
-									self.updateActions();
-									self.initFeedbacks();
-
-									if (variablesHelper.initDefinitions) {
-										variablesHelper.initDefinitions(self);
-									}
-									if (self.updatePresets) self.updatePresets();
+									this.scheduleRebuild();
 								} else if (result[c]['name'] == 'timelineRenamed') {
 									for (var b = 0; b < result[c]['entries'].length; b++) {
 										var namePre  = result[c]['entries'][b]['namePre'];
@@ -1050,18 +1222,68 @@ class Pixera {
 										}
 									}
 									// Rebuild so display names in actions, variable defs and presets reflect new name
-									self.updateActions();
-									self.initFeedbacks();
-
-									if (variablesHelper.initDefinitions) {
-										variablesHelper.initDefinitions(self);
+									this.scheduleRebuild();
+								} else if (result[c]['name'] == 'cueAdded') {
+									for (var b = 0; b < result[c]['entries'].length; b++) {
+										var addedCues = result[c]['entries'][b]['handles'] || [];
+										self.log('debug', 'monitoring cueAdded: ' + addedCues.join(','));
+										for (var h = 0; h < addedCues.length; h++) {
+											//the owning timeline is unknown for a new cue
+											this.resolveCue(addedCues[h]);
+										}
 									}
-									if (self.updatePresets) self.updatePresets();
+								} else if (result[c]['name'] == 'cueChanged') {
+									for (var b = 0; b < result[c]['entries'].length; b++) {
+										var changedCues = result[c]['entries'][b]['handles'] || [];
+										self.log('debug', 'monitoring cueChanged: ' + changedCues.join(','));
+										for (var h = 0; h < changedCues.length; h++) {
+											var changedCue = self.CUES ? self.CUES[changedCues[h]] : undefined;
+											if (!changedCue || changedCue.timelineHandle === null || changedCue.timelineHandle === undefined) {
+												//Pixera also reports brand new cues here - resolve their timeline first
+												this.resolveCue(changedCues[h]);
+											} else {
+												//name, number and time may all have changed
+												this.requestCueDetails(changedCues[h]);
+												this.scheduleCueResync(changedCue.timelineHandle);
+											}
+										}
+									}
+								} else if (result[c]['name'] == 'cueRemoved') {
+									for (var b = 0; b < result[c]['entries'].length; b++) {
+										var removedCues = result[c]['entries'][b]['handles'] || [];
+										self.log('debug', 'monitoring cueRemoved: ' + removedCues.join(','));
+										for (var h = 0; h < removedCues.length; h++) {
+											var goneCue = self.CUES ? self.CUES[removedCues[h]] : undefined;
+											//remember the timeline before dropping the record, then re-read its list
+											if (goneCue) this.scheduleCueResync(goneCue.timelineHandle);
+											cuesHelper.removeCue(self, removedCues[h]);
+										}
+									}
+									cuesHelper.recomputePointers(self);
+									this.scheduleRebuild();
+								} else if (result[c]['name'] == 'cueApplied') {
+									for (var b = 0; b < result[c]['entries'].length; b++) {
+										var appliedCues = result[c]['entries'][b]['handles'] || [];
+										for (var h = 0; h < appliedCues.length; h++) {
+											var appliedHandle = appliedCues[h];
+											var appliedCue = self.CUES ? self.CUES[appliedHandle] : undefined;
+											if (!appliedCue || appliedCue.timelineHandle === null || appliedCue.timelineHandle === undefined) {
+												//unknown cue - resolve it, it will be picked up on the next apply
+												this.resolveCue(appliedHandle);
+												continue;
+											}
+											var appliedTl = self.CHOICES_TIMELINEFEEDBACK.find(t => t.handle === appliedCue.timelineHandle);
+											if (appliedTl) appliedTl.cueApplied = appliedHandle;
+										}
+									}
 								}
 							}
 
-							// After processing monitoring entries, refresh Companion variables
-							
+							// After processing monitoring entries, refresh cue pointers and variables
+							cuesHelper.recomputePointers(self);
+							self.checkFeedbacks('cue_is_current');
+							self.checkFeedbacks('cue_is_next');
+
 							if (variablesHelper.updateVariables) {
 								variablesHelper.updateVariables(self);
 							}
@@ -1072,7 +1294,13 @@ class Pixera {
 					{
 						var result = jsonData.result;
 						if (result != null) {
+							//the 'Selected Timeline' cue lists follow the selection, so rebuild on change
+							var selectionChanged =
+								(self.SELECTEDTIMELINES || []).join(',') !== result.join(',');
 							self.SELECTEDTIMELINES = result;
+							if (selectionChanged) {
+								this.scheduleRebuild();
+							}
 
 							
 							// Direct reference to the selected timeline's CHOICES_TIMELINEFEEDBACK entry.
